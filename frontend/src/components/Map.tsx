@@ -1,9 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import mapboxgl from 'mapbox-gl';
-import 'mapbox-gl/dist/mapbox-gl.css';
+declare global {
+  interface Window {
+    mapboxgl: any;
+  }
+}
 import { MetroLine, Station, TrainPosition } from '../types';
 import { fetchMapboxToken } from '../services/api';
 
+const ENV_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
 const DEFAULT_TOKEN = 'pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw';
 
 interface MapProps {
@@ -24,8 +28,8 @@ const Map = ({
   onTrainHover,
 }: MapProps) => {
   const mapContainer = useRef<HTMLDivElement>(null);
-  const map = useRef<mapboxgl.Map | null>(null);
-  const trainMarkers = useRef<{ [key: string]: mapboxgl.Marker }>({});
+  const map = useRef<any>(null);
+  const trainMarkers = useRef<{ [key: string]: any }>({});
   const [prevPositions, setPrevPositions] = useState<{ [key: string]: [number, number] }>({});
   const [mapboxToken, setMapboxToken] = useState<string | null>(null);
   const [isTokenLoaded, setIsTokenLoaded] = useState(false);
@@ -33,15 +37,21 @@ const Map = ({
   useEffect(() => {
     const loadToken = async () => {
       try {
-        const token = await fetchMapboxToken();
-        const finalToken = token || DEFAULT_TOKEN;
+        let finalToken = ENV_TOKEN;
+        
+        if (!finalToken) {
+          const apiToken = await fetchMapboxToken();
+          finalToken = apiToken || DEFAULT_TOKEN;
+        }
+        
         setMapboxToken(finalToken);
-        mapboxgl.accessToken = finalToken;
+        window.mapboxgl.accessToken = finalToken;
         setIsTokenLoaded(true);
-        console.log('Mapbox token loaded successfully');
+        console.log('Mapbox token loaded successfully:', finalToken ? 'Custom token' : 'Default token');
       } catch (error) {
         console.error('Error loading Mapbox token:', error);
-        mapboxgl.accessToken = DEFAULT_TOKEN;
+        window.mapboxgl.accessToken = ENV_TOKEN || DEFAULT_TOKEN;
+        setMapboxToken(ENV_TOKEN || DEFAULT_TOKEN);
         setIsTokenLoaded(true);
       }
     };
@@ -52,20 +62,32 @@ const Map = ({
     if (!mapContainer.current || !isTokenLoaded) return;
 
     console.log('Initializing map with token:', mapboxToken ? `${mapboxToken.substring(0, 4)}...${mapboxToken.substring(mapboxToken.length - 4)}` : 'default');
-    map.current = new mapboxgl.Map({
-      container: mapContainer.current,
-      style: 'mapbox://styles/mapbox/dark-v11', // Use dark theme as specified
-      center: [4.9041, 52.3676], // Amsterdam center
-      zoom: 13,
-    });
+    const token = ENV_TOKEN || DEFAULT_TOKEN;
+    window.mapboxgl.accessToken = token;
+    console.log('Setting Mapbox token directly:', token ? 'Custom token' : 'Default token');
     
-    map.current.on('error', (e) => {
-      console.error('Mapbox error:', e.error);
-    });
+    try {
+      map.current = new window.mapboxgl.Map({
+        container: mapContainer.current,
+        style: 'mapbox://styles/mapbox/dark-v11', // Dark style for Amsterdam
+        center: [4.9041, 52.3676], // Amsterdam center
+        zoom: 13,
+        minZoom: 10,
+        maxZoom: 17,
+      });
+      console.log('Map initialized successfully');
+      
+      map.current.on('error', (e: any) => {
+        console.error('Mapbox error:', e.error);
+      });
 
-    map.current.on('load', () => {
-      map.current?.addControl(new mapboxgl.NavigationControl(), 'top-right');
-    });
+      map.current.on('load', () => {
+        console.log('Map loaded successfully');
+        map.current?.addControl(new window.mapboxgl.NavigationControl(), 'top-right');
+      });
+    } catch (error) {
+      console.error('Error initializing map:', error);
+    }
 
     return () => {
       map.current?.remove();
@@ -144,7 +166,7 @@ const Map = ({
         transition: transform 0.2s ease, box-shadow 0.2s ease;
       `;
 
-      new mapboxgl.Marker(el)
+      new window.mapboxgl.Marker(el)
         .setLngLat([station.longitude, station.latitude])
         .addTo(map.current!);
 
@@ -208,7 +230,7 @@ const Map = ({
         `;
         el.appendChild(textSpan);
         
-        const marker = new mapboxgl.Marker(el)
+        const marker = new window.mapboxgl.Marker(el)
           .setLngLat(prevPosition)
           .addTo(map.current!);
         
