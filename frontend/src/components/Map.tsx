@@ -108,8 +108,8 @@ const Map = ({
           },
           paint: {
             'line-color': `#${line.color}`,
-            'line-width': 5,
-            'line-opacity': 1.0,
+            'line-width': 6,
+            'line-opacity': 0.9,
             'line-blur': 0.5,
           },
         });
@@ -133,13 +133,15 @@ const Map = ({
       const el = document.createElement('div');
       el.className = 'station-marker';
       el.style.cssText = `
-        width: 12px;
-        height: 12px;
-        background-color: white;
+        width: 14px;
+        height: 14px;
+        background-color: #ffffff;
         border-radius: 50%;
-        border: 2px solid rgba(0, 0, 0, 0.5);
+        border: 3px solid #1f2937;
         cursor: pointer;
         z-index: 5;
+        box-shadow: 0 0 8px 2px rgba(255,255,255,0.4);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
       `;
 
       new mapboxgl.Marker(el)
@@ -151,11 +153,13 @@ const Map = ({
       });
 
       el.addEventListener('mouseenter', () => {
-        el.style.transform = 'scale(1.2)';
+        el.style.transform = 'scale(1.3)';
+        el.style.boxShadow = '0 0 12px 4px rgba(255,255,255,0.6)';
       });
 
       el.addEventListener('mouseleave', () => {
         el.style.transform = 'scale(1)';
+        el.style.boxShadow = '0 0 8px 2px rgba(255,255,255,0.4)';
       });
     });
   }, [stations, onStationClick]);
@@ -180,17 +184,17 @@ const Map = ({
         
         el.style.cssText = `
           background-color: ${color};
-          width: 32px;
-          height: 32px;
+          width: 36px;
+          height: 36px;
           border-radius: 50%;
-          border: 3px solid white;
+          border: 4px solid #ffffff;
           display: flex;
           align-items: center;
           justify-content: center;
           cursor: pointer;
-          box-shadow: 0 0 10px 2px rgba(255,255,255,0.3);
+          box-shadow: 0 0 15px 3px rgba(255,255,255,0.5);
           z-index: 10;
-          transition: transform 0.3s ease;
+          transition: transform 0.3s ease, box-shadow 0.3s ease;
         `;
         
         const textSpan = document.createElement('span');
@@ -198,8 +202,9 @@ const Map = ({
         textSpan.style.cssText = `
           color: white;
           font-weight: bold;
-          font-size: 14px;
-          text-shadow: 0 0 2px black;
+          font-size: 16px;
+          text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
+          letter-spacing: 0.5px;
         `;
         el.appendChild(textSpan);
         
@@ -209,11 +214,13 @@ const Map = ({
         
         el.addEventListener('mouseenter', () => {
           el.style.transform = 'scale(1.2)';
+          el.style.boxShadow = '0 0 20px 5px rgba(255,255,255,0.7)';
           onTrainHover(train);
         });
         
         el.addEventListener('mouseleave', () => {
           el.style.transform = 'scale(1)';
+          el.style.boxShadow = '0 0 15px 3px rgba(255,255,255,0.5)';
           onTrainHover(null);
         });
         
