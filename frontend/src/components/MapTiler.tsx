@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { MetroLine, Station, TrainPosition } from '../types';
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
-const DARK_STYLE = 'mapbox://styles/mapbox/navigation-night-v1';
+const DARK_STYLE = 'mapbox://styles/mapbox/dark-v11';
 
 interface MapProps {
   metroLines: MetroLine[];
