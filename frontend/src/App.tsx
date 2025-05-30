@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import Map from './components/Map';
 import Sidebar from './components/Sidebar';
+import MapTiler from './components/MapTiler';
 import { MetroLine, Station, TrainPosition } from './types';
 import { fetchMetroLines, fetchStations, fetchTrainPositions } from './services/api';
 
@@ -116,7 +116,7 @@ function App() {
               <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white"></div>
             </div>
           ) : (
-            <Map
+            <MapTiler
               metroLines={metroLines}
               stations={stations}
               trainPositions={trainPositions}
