@@ -4,7 +4,8 @@ import zipfile
 import csv
 import requests
 import math
-from typing import Dict, List, Optional, Tuple
+import json
+from typing import Dict, List, Optional, Tuple, Any
 import logging
 from datetime import datetime, timedelta
 
@@ -16,6 +17,10 @@ GTFS_URL = "http://gtfs.openov.nl/gtfs-rt/gtfs-openov-nl.zip"
 VEHICLE_POSITIONS_URL = "http://gtfs.openov.nl/gtfs-rt/vehiclePositions.pb"
 AMSTERDAM_METRO_AGENCY = "GVB"  # GVB is Amsterdam's public transport company
 METRO_ROUTE_TYPE = 1  # In GTFS, 1 represents subway/metro
+
+OVAPI_BASE_URL = "https://v0.ovapi.nl"
+OVAPI_GVB_URL = f"{OVAPI_BASE_URL}/gvb"
+OVAPI_VEHICLE_URL = f"{OVAPI_BASE_URL}/vehicle"
 
 
 class GTFSService:
@@ -57,18 +62,18 @@ class GTFSService:
             
             stations = self._process_stations(
                 os.path.join(temp_dir, 'stops.txt'),
-                metro_routes.keys()
+                list(metro_routes.keys())
             )
             
             shapes = self._process_shapes(
                 os.path.join(temp_dir, 'shapes.txt'),
-                metro_routes.keys()
+                list(metro_routes.keys())
             )
             
             self._associate_stations_with_routes(
                 os.path.join(temp_dir, 'stop_times.txt'),
                 stations,
-                metro_routes.keys()
+                list(metro_routes.keys())
             )
             
             metro_lines = {}
@@ -314,8 +319,84 @@ class GTFSService:
         return stations
     
     def get_train_positions(self) -> List[TrainPosition]:
-        """Get current train positions."""
+        """Get current train positions from OVAPI or fallback to mock data."""
         
+        if self.redis_service:
+            cached_data = self.redis_service.get_data("train_positions")
+            if cached_data:
+                return [TrainPosition.model_validate(pos) for pos in cached_data]
+        
+        try:
+            positions = self._get_ovapi_train_positions()
+            
+            if positions:
+                if self.redis_service:
+                    self.redis_service.set_data(
+                        "train_positions",
+                        [pos.model_dump() for pos in positions],
+                        expiry=3  # 3 seconds
+                    )
+                return positions
+        except Exception as e:
+            logger.warning(f"Error fetching train positions from OVAPI: {str(e)}. Falling back to mock data.")
+        
+        return self._get_mock_train_positions()
+    
+    def _get_ovapi_train_positions(self) -> List[TrainPosition]:
+        """Get real-time train positions from OVAPI."""
+        try:
+            response = requests.get(OVAPI_GVB_URL, timeout=5)
+            response.raise_for_status()
+            
+            data = response.json()
+            current_time = int(datetime.now().timestamp())
+            positions = []
+            
+            for vehicle_id, vehicle_data in data.items():
+                if not vehicle_id.startswith('GVB:'):
+                    continue
+                
+                line_info = vehicle_data.get('LinePublicNumber', '')
+                if line_info not in ['50', '51', '52', '53', '54']:
+                    continue
+                
+                position_data = vehicle_data.get('Position', {})
+                latitude = position_data.get('Latitude')
+                longitude = position_data.get('Longitude')
+                
+                if not latitude or not longitude:
+                    continue
+                
+                train_id = f"train_{line_info}_{vehicle_id.split(':')[-1]}"
+                
+                positions.append(
+                    TrainPosition(
+                        id=train_id,
+                        route_id=line_info,
+                        latitude=float(latitude),
+                        longitude=float(longitude),
+                        bearing=float(position_data.get('Bearing', 0)),
+                        speed=float(position_data.get('Speed', 35.0)),
+                        status="IN_TRANSIT_TO",
+                        timestamp=current_time,
+                        vehicle_id=vehicle_id,
+                        trip_id=vehicle_data.get('TripId', f"trip_{line_info}")
+                    )
+                )
+            
+            if positions:
+                logger.info(f"Retrieved {len(positions)} real-time train positions from OVAPI")
+                return positions
+            else:
+                logger.warning("No train positions found in OVAPI data")
+                return []
+                
+        except Exception as e:
+            logger.error(f"Error fetching data from OVAPI: {str(e)}")
+            raise
+    
+    def _get_mock_train_positions(self) -> List[TrainPosition]:
+        """Generate mock train positions data."""
         current_time = int(datetime.now().timestamp())
         
         mock_positions = [
@@ -350,11 +431,5 @@ class GTFSService:
                     )
                 )
         
-        if self.redis_service:
-            self.redis_service.set_data(
-                "train_positions",
-                [pos.model_dump() for pos in mock_positions],
-                expiry=3  # 3 seconds
-            )
-        
+        logger.info("Using mock train positions data")
         return mock_positions
