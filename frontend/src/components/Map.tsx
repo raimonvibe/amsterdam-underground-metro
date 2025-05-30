@@ -69,11 +69,12 @@ const Map = ({
     try {
       map.current = new window.mapboxgl.Map({
         container: mapContainer.current,
-        style: 'mapbox://styles/mapbox/dark-v11', // Dark style for Amsterdam
+        style: 'mapbox://styles/mapbox/navigation-night-v1', // Alternative dark style for Amsterdam
         center: [4.9041, 52.3676], // Amsterdam center
         zoom: 13,
         minZoom: 10,
         maxZoom: 17,
+        attributionControl: true,
       });
       console.log('Map initialized successfully');
       
