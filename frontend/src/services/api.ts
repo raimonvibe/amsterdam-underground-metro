@@ -6,6 +6,9 @@ export const fetchMetroLines = async (): Promise<MetroLine[]> => {
   try {
     const response = await fetch(`${API_BASE}/metro-lines`);
     if (!response.ok) {
+      if (response.status === 503) {
+        throw new Error('Metro lines data temporarily unavailable');
+      }
       throw new Error(`Error fetching metro lines: ${response.statusText}`);
     }
     return await response.json();
@@ -19,6 +22,9 @@ export const fetchStations = async (): Promise<Station[]> => {
   try {
     const response = await fetch(`${API_BASE}/stations`);
     if (!response.ok) {
+      if (response.status === 503) {
+        throw new Error('Stations data temporarily unavailable');
+      }
       throw new Error(`Error fetching stations: ${response.statusText}`);
     }
     return await response.json();
@@ -32,6 +38,9 @@ export const fetchTrainPositions = async (): Promise<TrainPosition[]> => {
   try {
     const response = await fetch(`${API_BASE}/train-positions`);
     if (!response.ok) {
+      if (response.status === 503) {
+        throw new Error('Live train data temporarily unavailable');
+      }
       throw new Error(`Error fetching train positions: ${response.statusText}`);
     }
     return await response.json();

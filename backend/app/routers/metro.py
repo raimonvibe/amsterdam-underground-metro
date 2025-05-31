@@ -21,6 +21,8 @@ async def get_metro_lines(
     try:
         metro_lines = services["gtfs"].get_metro_lines(force_refresh=force_refresh)
         return list(metro_lines.values())
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching metro lines: {str(e)}")
 
@@ -33,6 +35,8 @@ async def get_stations(
     try:
         stations = services["gtfs"].get_stations(force_refresh=force_refresh)
         return list(stations.values())
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching stations: {str(e)}")
 

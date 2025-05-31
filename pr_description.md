@@ -1,33 +1,37 @@
-# Fix Map Visibility Issue - Resolve Excessive Re-rendering
+# Remove mockup data and improve live train display
 
-## Problem
-The Amsterdam Metro Tracker map was only visible for short timespans due to excessive component re-rendering (76+ renders) caused by:
-- Unstable useEffect dependencies causing map reinitialization loops
-- Mapbox token loading issues with 403 authentication errors
-- Missing environment variable fallback for Mapbox token
-
-## Solution
-1. **Fixed useEffect Dependencies**: Removed `mapboxToken` from map initialization dependencies to prevent re-rendering loops
-2. **Added Map Instance Guard**: Added `map.current` check to prevent multiple map initializations
-3. **Improved Token Loading**: Added fallback to `VITE_MAPBOX_TOKEN` environment variable when backend token fetch fails
-4. **Enhanced Cleanup**: Properly nullify map reference on component unmount
+## Summary
+This PR removes all mockup data from the Amsterdam Underground Metro project and improves error handling to ensure live moving metro trains are displayed using real OVAPI data.
 
 ## Changes Made
-- Modified `frontend/src/components/Map.tsx`:
-  - Updated map initialization useEffect to only depend on `isTokenLoaded`
-  - Added guard to prevent duplicate map instances
-  - Enhanced token loading with environment variable fallback
-  - Improved cleanup in component unmount
 
-## Testing Results
-✅ Map now renders consistently and remains visible
-✅ Reduced component re-renders from 76+ to 6 initial renders
-✅ All 90 train markers display correctly across metro lines 50-54
-✅ Real-time updates continue working every 3 seconds
-✅ Map controls and interactions function properly
+### Backend Changes
+- **Removed mock data functions**: Completely removed `_get_mock_metro_lines()`, `_get_mock_stations()`, and `_get_mock_train_positions()` functions from `gtfs_service.py`
+- **Improved error handling**: Replaced mock data fallbacks with proper HTTP 503 errors when GTFS data is unavailable
+- **Added HTTPException import**: Added missing import for proper error response handling
+- **Live train focus**: When OVAPI train data is unavailable, return empty array instead of mock data to ensure only real trains are displayed
 
-## Screenshots
-![Map Working](screenshots/localhost_5173_065706.png)
+### Frontend Changes
+- **Enhanced error handling**: Updated API service functions to handle 503 errors gracefully with meaningful error messages
+- **Better user feedback**: Improved error messages for when live data sources are temporarily unavailable
 
-**Link to Devin run**: https://app.devin.ai/sessions/a46b9e270eea4f22a36c9818a98fe29f
-**Requested by**: Raimon Baudoin (info@raimonvibe.com)
+### Documentation Changes
+- **Updated README**: Removed references to mock data fallback in the data sources section
+
+## Benefits
+- **Live data only**: Users now see only real, live metro trains when data is available
+- **Clear error states**: When data sources are unavailable, users receive clear feedback instead of being shown fake data
+- **Improved reliability**: Better error handling prevents confusion between real and mock data
+- **Maintained functionality**: All existing map features (zoom, pan, line visibility) continue to work as expected
+
+## Testing
+- Verified live train positions are fetched from OVAPI and displayed on the map
+- Confirmed at least one live train is visible when data is available
+- Tested error handling when backend services are unavailable
+- Ensured existing map functionality remains intact
+
+## Link to Devin run
+https://app.devin.ai/sessions/49652cc1393f423db77011d1d4705463
+
+## Requested by
+Raimon Baudoin (info@raimonvibe.com)

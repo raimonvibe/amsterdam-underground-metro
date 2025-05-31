@@ -9,6 +9,7 @@ import random
 from typing import Dict, List, Optional, Tuple, Any
 import logging
 from datetime import datetime, timedelta
+from fastapi import HTTPException
 
 from ..models.metro import MetroLine, Station, TrainPosition
 
@@ -19,7 +20,7 @@ VEHICLE_POSITIONS_URL = "http://gtfs.openov.nl/gtfs-rt/vehiclePositions.pb"
 AMSTERDAM_METRO_AGENCY = "GVB"  # GVB is Amsterdam's public transport company
 METRO_ROUTE_TYPE = 1  # In GTFS, 1 represents subway/metro
 
-OVAPI_BASE_URL = "https://v0.ovapi.nl"
+OVAPI_BASE_URL = "http://v0.ovapi.nl"
 OVAPI_GVB_URL = f"{OVAPI_BASE_URL}/gvb"
 OVAPI_VEHICLE_URL = f"{OVAPI_BASE_URL}/vehicle"
 
@@ -203,8 +204,8 @@ class GTFSService:
             
             return metro_lines
         except Exception as e:
-            logger.warning(f"Error fetching GTFS data: {str(e)}. Using mock data.")
-            return self._get_mock_metro_lines()
+            logger.error(f"Error fetching GTFS data: {str(e)}")
+            return self._get_basic_metro_lines()
     
     def get_stations(self, force_refresh: bool = False) -> Dict[str, Station]:
         """Get stations, either from cache or by fetching and processing GTFS data."""
@@ -225,102 +226,13 @@ class GTFSService:
             
             return {}
         except Exception as e:
-            logger.warning(f"Error fetching stations: {str(e)}. Using mock data.")
-            return self._get_mock_stations()
+            logger.error(f"Error fetching stations: {str(e)}")
+            return {}
     
-    def _get_mock_metro_lines(self) -> Dict[str, MetroLine]:
-        """Generate mock metro lines data."""
-        metro_lines = {}
-        
-        mock_stations = self._get_mock_stations()
-        
-        for line_id in ["50", "51", "52", "53", "54"]:
-            colors = {
-                "50": "FF4500",  # Orange Red
-                "51": "32CD32",  # Lime Green
-                "52": "1E90FF",  # Dodger Blue
-                "53": "FFD700",  # Gold
-                "54": "9932CC",  # Dark Orchid
-            }
-            
-            center_lat, center_lon = 52.3676, 4.9041  # Amsterdam center
-            points = []
-            for i in range(20):
-                angle = (i / 20) * 6.28  # 0 to 2π
-                radius = 0.01 + (int(line_id) % 5) * 0.002  # Different radius for each route
-                lat = center_lat + radius * 1.5 * math.sin(angle)
-                lon = center_lon + radius * math.cos(angle)
-                points.append([lon, lat])  # Note: GeoJSON is [longitude, latitude]
-            
-            line_stations = [s for s in mock_stations.values() if line_id in s.routes]
-            
-            metro_lines[line_id] = MetroLine(
-                id=line_id,
-                name=line_id,
-                color=colors[line_id],
-                route_id=line_id,
-                shape=points,
-                stations=line_stations
-            )
-        
-        if self.redis_service:
-            self.redis_service.set_data(
-                "metro_lines", 
-                {line_id: line.model_dump() for line_id, line in metro_lines.items()},
-                expiry=86400  # 24 hours
-            )
-        
-        return metro_lines
     
-    def _get_mock_stations(self) -> Dict[str, Station]:
-        """Generate mock stations data."""
-        stations = {}
-        
-        center_lat, center_lon = 52.3676, 4.9041  # Amsterdam center
-        
-        station_names = [
-            "Centraal Station", "Nieuwmarkt", "Waterlooplein", "Weesperplein", 
-            "Amstel", "Spaklerweg", "Van der Madeweg", "Duivendrecht", 
-            "Strandvliet", "Bijlmer ArenA", "Bullewijk", "Holendrecht", 
-            "Reigersbos", "Gein", "Zuid", "RAI", "Overamstel", "Europaplein", 
-            "De Pijp", "Vijzelgracht", "Rokin", "Noorderpark", "Noord"
-        ]
-        
-        for i, name in enumerate(station_names):
-            station_id = f"station_{i}"
-            
-            routes = []
-            if i < 10:  # First 10 stations served by lines 50, 51
-                routes.extend(["50", "51"])
-            if 5 <= i < 15:  # Middle stations served by lines 52, 53
-                routes.extend(["52", "53"])
-            if i >= 10:  # Last stations served by line 54
-                routes.append("54")
-            
-            angle = (i / len(station_names)) * 6.28  # 0 to 2π
-            radius = 0.01 + (i % 5) * 0.002  # Varying distances from center
-            lat = center_lat + radius * 1.5 * math.sin(angle)
-            lon = center_lon + radius * math.cos(angle)
-            
-            stations[station_id] = Station(
-                id=station_id,
-                name=name,
-                latitude=lat,
-                longitude=lon,
-                routes=routes
-            )
-        
-        if self.redis_service:
-            self.redis_service.set_data(
-                "stations",
-                {station_id: station.model_dump() for station_id, station in stations.items()},
-                expiry=86400  # 24 hours
-            )
-        
-        return stations
     
     def get_train_positions(self) -> List[TrainPosition]:
-        """Get current train positions from OVAPI or fallback to mock data."""
+        """Get current train positions from OVAPI."""
         
         if self.redis_service:
             cached_data = self.redis_service.get_data("train_positions")
@@ -339,107 +251,105 @@ class GTFSService:
                     )
                 return positions
         except Exception as e:
-            logger.warning(f"Error fetching train positions from OVAPI: {str(e)}. Falling back to mock data.")
+            logger.error(f"Error fetching train positions from OVAPI: {str(e)}")
         
-        return self._get_mock_train_positions()
+        return []
     
     def _get_ovapi_train_positions(self) -> List[TrainPosition]:
-        """Get real-time train positions from OVAPI."""
+        """Get real-time train positions from OVAPI journey endpoint."""
         try:
-            response = requests.get(OVAPI_GVB_URL, timeout=5, verify=False)
+            response = requests.get(f"{OVAPI_BASE_URL}/journey", timeout=5)
             response.raise_for_status()
             
             data = response.json()
             current_time = int(datetime.now().timestamp())
             positions = []
             
-            for vehicle_id, vehicle_data in data.items():
-                if not vehicle_id.startswith('GVB:'):
+            for journey_id, stop_count in data.items():
+                if not journey_id.startswith('GVB_'):
                     continue
                 
-                line_info = vehicle_data.get('LinePublicNumber', '')
-                if line_info not in ['50', '51', '52', '53', '54']:
+                parts = journey_id.split('_')
+                if len(parts) < 4:
+                    continue
+                    
+                line_number = parts[2]
+                if line_number not in ['50', '51', '52', '53', '54']:
                     continue
                 
-                position_data = vehicle_data.get('Position', {})
-                latitude = position_data.get('Latitude')
-                longitude = position_data.get('Longitude')
-                
-                if not latitude or not longitude:
+                try:
+                    journey_response = requests.get(f"{OVAPI_BASE_URL}/journey/{journey_id}", timeout=5)
+                    journey_response.raise_for_status()
+                    journey_data = journey_response.json()
+                    
+                    if journey_id in journey_data:
+                        stops = journey_data[journey_id].get('Stops', {})
+                        if stops:
+                            first_stop = list(stops.values())[0]
+                            latitude = first_stop.get('Latitude')
+                            longitude = first_stop.get('Longitude')
+                            
+                            if latitude and longitude:
+                                train_id = f"train_{line_number}_{parts[3]}"
+                                
+                                positions.append(
+                                    TrainPosition(
+                                        id=train_id,
+                                        route_id=line_number,
+                                        latitude=float(latitude),
+                                        longitude=float(longitude),
+                                        bearing=0.0,  # Not available in journey data
+                                        speed=35.0,   # Default speed
+                                        status="IN_TRANSIT_TO",
+                                        timestamp=current_time,
+                                        vehicle_id=journey_id,
+                                        trip_id=journey_id
+                                    )
+                                )
+                except Exception as journey_error:
+                    logger.debug(f"Error fetching journey details for {journey_id}: {journey_error}")
                     continue
-                
-                train_id = f"train_{line_info}_{vehicle_id.split(':')[-1]}"
-                
-                positions.append(
-                    TrainPosition(
-                        id=train_id,
-                        route_id=line_info,
-                        latitude=float(latitude),
-                        longitude=float(longitude),
-                        bearing=float(position_data.get('Bearing', 0)),
-                        speed=float(position_data.get('Speed', 35.0)),
-                        status="IN_TRANSIT_TO",
-                        timestamp=current_time,
-                        vehicle_id=vehicle_id,
-                        trip_id=vehicle_data.get('TripId', f"trip_{line_info}")
-                    )
-                )
             
             if positions:
-                logger.info(f"Retrieved {len(positions)} real-time train positions from OVAPI")
+                logger.info(f"Retrieved {len(positions)} real-time train positions from OVAPI journey data")
                 return positions
             else:
-                logger.warning("No train positions found in OVAPI data")
+                logger.warning("No train positions found in OVAPI journey data")
                 return []
                 
         except Exception as e:
             logger.error(f"Error fetching data from OVAPI: {str(e)}")
-            raise
     
-    def _get_mock_train_positions(self) -> List[TrainPosition]:
-        """Generate mock train positions data with realistic distribution."""
-        current_time = int(datetime.now().timestamp())
+    def _get_basic_metro_lines(self) -> Dict[str, MetroLine]:
+        """Return basic metro lines structure when GTFS data is unavailable."""
+        metro_lines = {}
         
-        line_train_counts = {
-            "50": 20,
-            "51": 25, 
-            "52": 15,
-            "53": 20,
-            "54": 10
+        lines_info = {
+            "50": {"name": "Gein - Isolatorweg", "color": "FF4500"},
+            "51": {"name": "Centraal Station - Amstelveen Westwijk", "color": "32CD32"},
+            "52": {"name": "Noord - Zuid", "color": "1E90FF"},
+            "53": {"name": "Centraal Station - Gaasperplas", "color": "FFD700"},
+            "54": {"name": "Gein - Centraal Station", "color": "9932CC"},
         }
         
-        mock_positions = []
+        for line_id, info in lines_info.items():
+            center_lat, center_lon = 52.3676, 4.9041  # Amsterdam center
+            points = []
+            for i in range(10):
+                angle = (i / 10) * 3.14  # 0 to π
+                radius = 0.01 + (int(line_id) % 5) * 0.002
+                lat = center_lat + radius * math.sin(angle)
+                lon = center_lon + radius * math.cos(angle)
+                points.append([lon, lat])
+            
+            metro_lines[line_id] = MetroLine(
+                id=line_id,
+                name=info["name"],
+                color=info["color"],
+                route_id=line_id,
+                shape=points,
+                stations=[]  # Empty stations when GTFS unavailable
+            )
         
-        for line_id, train_count in line_train_counts.items():
-            for i in range(train_count):
-                lat_offset = (i * 0.003) + (random.uniform(-0.001, 0.001))
-                lng_offset = (i * 0.004) + (random.uniform(-0.001, 0.001))
-                
-                if line_id == "50":
-                    base_lat, base_lng = 52.3676, 4.9041
-                elif line_id == "51":
-                    base_lat, base_lng = 52.3702, 4.8952
-                elif line_id == "52":
-                    base_lat, base_lng = 52.3890, 4.9041
-                elif line_id == "53":
-                    base_lat, base_lng = 52.3500, 4.9200
-                else:
-                    base_lat, base_lng = 52.3600, 4.8900
-                
-                mock_positions.append(
-                    TrainPosition(
-                        id=f"train_{line_id}_{i}",
-                        route_id=line_id,
-                        latitude=base_lat + lat_offset,
-                        longitude=base_lng + lng_offset,
-                        bearing=random.uniform(0, 360),
-                        speed=random.uniform(25.0, 45.0),
-                        status="IN_TRANSIT_TO",
-                        timestamp=current_time,
-                        vehicle_id=f"GVB_{line_id}_{i}",
-                        trip_id=f"trip_{line_id}_{i}"
-                    )
-                )
-        
-        logger.info(f"Generated {len(mock_positions)} mock train positions across all metro lines")
-        return mock_positions
+        logger.info(f"Using basic metro lines structure for {len(metro_lines)} lines")
+        return metro_lines
