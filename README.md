@@ -73,8 +73,7 @@ poetry run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 The application uses the following data sources:
 
 1. **OVAPI**: Primary source for real-time metro positions (https://v0.ovapi.nl)
-2. **Mock Data**: Fallback when OVAPI is unavailable or for development purposes
-3. **OpenStreetMap**: Geographical data for the map base layer
+2. **OpenStreetMap**: Geographical data for the map base layer
 
 ## Architecture
 
