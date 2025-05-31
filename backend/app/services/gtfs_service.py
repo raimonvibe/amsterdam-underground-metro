@@ -325,11 +325,11 @@ class GTFSService:
         metro_lines = {}
         
         lines_info = {
-            "50": {"name": "Gein - Isolatorweg", "color": "FF4500"},
-            "51": {"name": "Centraal Station - Amstelveen Westwijk", "color": "32CD32"},
-            "52": {"name": "Noord - Zuid", "color": "1E90FF"},
-            "53": {"name": "Centraal Station - Gaasperplas", "color": "FFD700"},
-            "54": {"name": "Gein - Centraal Station", "color": "9932CC"},
+            "50": {"name": "Gein - Isolatorweg", "color": "FFB3BA"},
+            "51": {"name": "Centraal Station - Amstelveen Westwijk", "color": "BAFFC9"},
+            "52": {"name": "Noord - Zuid", "color": "BAE1FF"},
+            "53": {"name": "Centraal Station - Gaasperplas", "color": "FFFFBA"},
+            "54": {"name": "Gein - Centraal Station", "color": "E1BAFF"},
         }
         
         for line_id, info in lines_info.items():
