@@ -36,14 +36,16 @@ const Map = ({
     const loadToken = async () => {
       try {
         const token = await fetchMapboxToken();
-        const finalToken = token || DEFAULT_TOKEN;
+        const finalToken = token || import.meta.env.VITE_MAPBOX_TOKEN || DEFAULT_TOKEN;
         setMapboxToken(finalToken);
         mapboxgl.accessToken = finalToken;
         setIsTokenLoaded(true);
         console.log('Mapbox token loaded successfully');
       } catch (error) {
         console.error('Error loading Mapbox token:', error);
-        mapboxgl.accessToken = DEFAULT_TOKEN;
+        const fallbackToken = import.meta.env.VITE_MAPBOX_TOKEN || DEFAULT_TOKEN;
+        setMapboxToken(fallbackToken);
+        mapboxgl.accessToken = fallbackToken;
         setIsTokenLoaded(true);
       }
     };
@@ -51,7 +53,7 @@ const Map = ({
   }, []);
 
   useEffect(() => {
-    if (!mapContainer.current || !isTokenLoaded) return;
+    if (!mapContainer.current || !isTokenLoaded || map.current) return;
 
     console.log('Initializing map with token:', mapboxToken ? `${mapboxToken.substring(0, 4)}...${mapboxToken.substring(mapboxToken.length - 4)}` : 'default');
     map.current = new mapboxgl.Map({
@@ -70,9 +72,12 @@ const Map = ({
     });
 
     return () => {
-      map.current?.remove();
+      if (map.current) {
+        map.current.remove();
+        map.current = null;
+      }
     };
-  }, [isTokenLoaded, mapboxToken]);
+  }, [isTokenLoaded]);
 
   useEffect(() => {
     if (!map.current || !map.current.loaded() || metroLines.length === 0) return;
