@@ -108,6 +108,7 @@ function App() {
           lastUpdated={lastUpdated}
           selectedStation={selectedStation}
           hoveredTrain={hoveredTrain}
+          trainPositions={trainPositions}
         />
         
         <div className="flex-1 relative rounded-lg overflow-hidden">
