@@ -20,7 +20,7 @@ VEHICLE_POSITIONS_URL = "http://gtfs.openov.nl/gtfs-rt/vehiclePositions.pb"
 AMSTERDAM_METRO_AGENCY = "GVB"  # GVB is Amsterdam's public transport company
 METRO_ROUTE_TYPE = 1  # In GTFS, 1 represents subway/metro
 
-OVAPI_BASE_URL = "https://v0.ovapi.nl"
+OVAPI_BASE_URL = "http://v0.ovapi.nl"
 OVAPI_GVB_URL = f"{OVAPI_BASE_URL}/gvb"
 OVAPI_VEHICLE_URL = f"{OVAPI_BASE_URL}/vehicle"
 
