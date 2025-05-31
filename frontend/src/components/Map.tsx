@@ -30,6 +30,8 @@ const Map = ({
   const [mapboxToken, setMapboxToken] = useState<string | null>(null);
   const [isTokenLoaded, setIsTokenLoaded] = useState(false);
   
+  console.log('Map component rendering, isTokenLoaded:', isTokenLoaded, 'mapboxToken:', mapboxToken ? 'loaded' : 'null');
+  
   useEffect(() => {
     const loadToken = async () => {
       try {
@@ -70,7 +72,7 @@ const Map = ({
     return () => {
       map.current?.remove();
     };
-  }, []);
+  }, [isTokenLoaded, mapboxToken]);
 
   useEffect(() => {
     if (!map.current || !map.current.loaded() || metroLines.length === 0) return;
