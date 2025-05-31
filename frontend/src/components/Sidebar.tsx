@@ -10,6 +10,7 @@ interface SidebarProps {
   lastUpdated: Date | null;
   selectedStation: Station | null;
   hoveredTrain: TrainPosition | null;
+  trainPositions: TrainPosition[];
 }
 
 const Sidebar = ({
@@ -20,6 +21,7 @@ const Sidebar = ({
   lastUpdated,
   selectedStation,
   hoveredTrain,
+  trainPositions,
 }: SidebarProps) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
@@ -59,30 +61,43 @@ const Sidebar = ({
               </button>
             </div>
             <div className="space-y-2">
-              {metroLines.map((line) => (
-                <div
-                  key={line.id}
-                  className="flex items-center space-x-2"
-                >
-                  <input
-                    type="checkbox"
-                    id={`line-${line.id}`}
-                    checked={visibleLines.includes(line.id)}
-                    onChange={() => onToggleLine(line.id)}
-                    className="rounded text-blue-500 focus:ring-blue-500"
-                  />
-                  <label
-                    htmlFor={`line-${line.id}`}
-                    className="flex items-center cursor-pointer"
+              {metroLines.map((line) => {
+                const lineTrainCount = trainPositions.filter(train => train.route_id === line.id).length;
+                return (
+                  <div
+                    key={line.id}
+                    className="flex items-center justify-between space-x-2"
                   >
-                    <span
-                      className="w-4 h-4 rounded-full mr-2"
-                      style={{ backgroundColor: `#${line.color}` }}
-                    ></span>
-                    <span>Line {line.name}</span>
-                  </label>
-                </div>
-              ))}
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id={`line-${line.id}`}
+                        checked={visibleLines.includes(line.id)}
+                        onChange={() => onToggleLine(line.id)}
+                        className="rounded text-blue-500 focus:ring-blue-500"
+                      />
+                      <label
+                        htmlFor={`line-${line.id}`}
+                        className="flex items-center cursor-pointer"
+                      >
+                        <span
+                          className="w-4 h-4 rounded-full mr-2"
+                          style={{ backgroundColor: `#${line.color}` }}
+                        ></span>
+                        <span>Line {line.name}</span>
+                      </label>
+                    </div>
+                    <span className="text-xs text-gray-400 bg-gray-800 px-2 py-1 rounded">
+                      {lineTrainCount} trains
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-3 pt-3 border-t border-gray-700">
+              <div className="text-sm text-gray-400">
+                Total active trains: <span className="text-white font-semibold">{trainPositions.length}</span>
+              </div>
             </div>
           </div>
 

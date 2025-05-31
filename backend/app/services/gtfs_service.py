@@ -5,6 +5,7 @@ import csv
 import requests
 import math
 import json
+import random
 from typing import Dict, List, Optional, Tuple, Any
 import logging
 from datetime import datetime, timedelta
@@ -345,7 +346,7 @@ class GTFSService:
     def _get_ovapi_train_positions(self) -> List[TrainPosition]:
         """Get real-time train positions from OVAPI."""
         try:
-            response = requests.get(OVAPI_GVB_URL, timeout=5)
+            response = requests.get(OVAPI_GVB_URL, timeout=5, verify=False)
             response.raise_for_status()
             
             data = response.json()
@@ -396,40 +397,49 @@ class GTFSService:
             raise
     
     def _get_mock_train_positions(self) -> List[TrainPosition]:
-        """Generate mock train positions data."""
+        """Generate mock train positions data with realistic distribution."""
         current_time = int(datetime.now().timestamp())
         
-        mock_positions = [
-            TrainPosition(
-                id=f"train_50_{i}",
-                route_id="50",
-                latitude=52.3676 + (i * 0.005),
-                longitude=4.9041 + (i * 0.005),
-                bearing=45.0,
-                speed=40.0,
-                status="IN_TRANSIT_TO",
-                timestamp=current_time,
-                vehicle_id=f"GVB_50_{i}",
-                trip_id=f"trip_50_{i}"
-            ) for i in range(5)
-        ]
+        line_train_counts = {
+            "50": 20,
+            "51": 25, 
+            "52": 15,
+            "53": 20,
+            "54": 10
+        }
         
-        for line in ["51", "52", "53", "54"]:
-            for i in range(5):
+        mock_positions = []
+        
+        for line_id, train_count in line_train_counts.items():
+            for i in range(train_count):
+                lat_offset = (i * 0.003) + (random.uniform(-0.001, 0.001))
+                lng_offset = (i * 0.004) + (random.uniform(-0.001, 0.001))
+                
+                if line_id == "50":
+                    base_lat, base_lng = 52.3676, 4.9041
+                elif line_id == "51":
+                    base_lat, base_lng = 52.3702, 4.8952
+                elif line_id == "52":
+                    base_lat, base_lng = 52.3890, 4.9041
+                elif line_id == "53":
+                    base_lat, base_lng = 52.3500, 4.9200
+                else:
+                    base_lat, base_lng = 52.3600, 4.8900
+                
                 mock_positions.append(
                     TrainPosition(
-                        id=f"train_{line}_{i}",
-                        route_id=line,
-                        latitude=52.3676 - (i * 0.003),
-                        longitude=4.9041 + (i * 0.004),
-                        bearing=135.0,
-                        speed=35.0,
+                        id=f"train_{line_id}_{i}",
+                        route_id=line_id,
+                        latitude=base_lat + lat_offset,
+                        longitude=base_lng + lng_offset,
+                        bearing=random.uniform(0, 360),
+                        speed=random.uniform(25.0, 45.0),
                         status="IN_TRANSIT_TO",
                         timestamp=current_time,
-                        vehicle_id=f"GVB_{line}_{i}",
-                        trip_id=f"trip_{line}_{i}"
+                        vehicle_id=f"GVB_{line_id}_{i}",
+                        trip_id=f"trip_{line_id}_{i}"
                     )
                 )
         
-        logger.info("Using mock train positions data")
+        logger.info(f"Generated {len(mock_positions)} mock train positions across all metro lines")
         return mock_positions
