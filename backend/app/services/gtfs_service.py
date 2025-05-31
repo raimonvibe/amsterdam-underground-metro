@@ -256,52 +256,65 @@ class GTFSService:
         return []
     
     def _get_ovapi_train_positions(self) -> List[TrainPosition]:
-        """Get real-time train positions from OVAPI."""
+        """Get real-time train positions from OVAPI journey endpoint."""
         try:
-            response = requests.get(OVAPI_GVB_URL, timeout=5, verify=False)
+            response = requests.get(f"{OVAPI_BASE_URL}/journey", timeout=5)
             response.raise_for_status()
             
             data = response.json()
             current_time = int(datetime.now().timestamp())
             positions = []
             
-            for vehicle_id, vehicle_data in data.items():
-                if not vehicle_id.startswith('GVB:'):
+            for journey_id, stop_count in data.items():
+                if not journey_id.startswith('GVB_'):
                     continue
                 
-                line_info = vehicle_data.get('LinePublicNumber', '')
-                if line_info not in ['50', '51', '52', '53', '54']:
+                parts = journey_id.split('_')
+                if len(parts) < 4:
+                    continue
+                    
+                line_number = parts[2]
+                if line_number not in ['50', '51', '52', '53', '54']:
                     continue
                 
-                position_data = vehicle_data.get('Position', {})
-                latitude = position_data.get('Latitude')
-                longitude = position_data.get('Longitude')
-                
-                if not latitude or not longitude:
+                try:
+                    journey_response = requests.get(f"{OVAPI_BASE_URL}/journey/{journey_id}", timeout=5)
+                    journey_response.raise_for_status()
+                    journey_data = journey_response.json()
+                    
+                    if journey_id in journey_data:
+                        stops = journey_data[journey_id].get('Stops', {})
+                        if stops:
+                            first_stop = list(stops.values())[0]
+                            latitude = first_stop.get('Latitude')
+                            longitude = first_stop.get('Longitude')
+                            
+                            if latitude and longitude:
+                                train_id = f"train_{line_number}_{parts[3]}"
+                                
+                                positions.append(
+                                    TrainPosition(
+                                        id=train_id,
+                                        route_id=line_number,
+                                        latitude=float(latitude),
+                                        longitude=float(longitude),
+                                        bearing=0.0,  # Not available in journey data
+                                        speed=35.0,   # Default speed
+                                        status="IN_TRANSIT_TO",
+                                        timestamp=current_time,
+                                        vehicle_id=journey_id,
+                                        trip_id=journey_id
+                                    )
+                                )
+                except Exception as journey_error:
+                    logger.debug(f"Error fetching journey details for {journey_id}: {journey_error}")
                     continue
-                
-                train_id = f"train_{line_info}_{vehicle_id.split(':')[-1]}"
-                
-                positions.append(
-                    TrainPosition(
-                        id=train_id,
-                        route_id=line_info,
-                        latitude=float(latitude),
-                        longitude=float(longitude),
-                        bearing=float(position_data.get('Bearing', 0)),
-                        speed=float(position_data.get('Speed', 35.0)),
-                        status="IN_TRANSIT_TO",
-                        timestamp=current_time,
-                        vehicle_id=vehicle_id,
-                        trip_id=vehicle_data.get('TripId', f"trip_{line_info}")
-                    )
-                )
             
             if positions:
-                logger.info(f"Retrieved {len(positions)} real-time train positions from OVAPI")
+                logger.info(f"Retrieved {len(positions)} real-time train positions from OVAPI journey data")
                 return positions
             else:
-                logger.warning("No train positions found in OVAPI data")
+                logger.warning("No train positions found in OVAPI journey data")
                 return []
                 
         except Exception as e:
